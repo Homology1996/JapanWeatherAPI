@@ -170,7 +170,7 @@ public class DefaultController implements ActionListener {
                 DownloadDataController action = ((IndexPanel) currentPanel).getDownloadDataController();
                 ScheduledExecutorService executorService = Executors.newSingleThreadScheduledExecutor();
                 Runnable checkDownload = () -> {
-                    if (counter.size() > (Constants.QUARTER / Constants.COUNTER_INTERVAL) || action.isCancelled()) {
+                    if (counter.size() > (Constants.TIMEOUT / Constants.COUNTER_INTERVAL) || action.isCancelled()) {
                         LOGGER.error("Exceeds the time limit");
                         this.setCurrentPanel(this.getPanelByName(Constants.INDEX_PANEL));
                         executorService.shutdown();
@@ -217,7 +217,7 @@ public class DefaultController implements ActionListener {
             GenerateReportController action = ((ResultPanel) currentPanel).getGenerateReportController();
             ScheduledExecutorService executorService = Executors.newSingleThreadScheduledExecutor();
             Runnable checkDownload = () -> {
-                if (counter.size() > (Constants.QUARTER / Constants.COUNTER_INTERVAL) || action.isCancelled()) {
+                if (counter.size() > (Constants.TIMEOUT / Constants.COUNTER_INTERVAL) || action.isCancelled()) {
                     LOGGER.error("Exceeds the time limit");
                     this.setCurrentPanel(this.getPanelByName(Constants.INDEX_PANEL));
                     executorService.shutdown();

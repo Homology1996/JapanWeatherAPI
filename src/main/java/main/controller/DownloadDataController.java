@@ -12,8 +12,9 @@ import org.apache.logging.log4j.Logger;
 import org.json.JSONArray;
 
 import javax.swing.*;
-import java.util.LinkedList;
-import java.util.List;
+import java.util.*;
+import java.util.concurrent.*;
+import java.util.concurrent.locks.ReentrantLock;
 
 public class DownloadDataController extends SwingWorker<String, Double> {
 
@@ -32,121 +33,159 @@ public class DownloadDataController extends SwingWorker<String, Double> {
         JButton nextStep = (JButton) MainFrame.getComponentMapForPanel(this.indexPanel)
                 .get(PanelUtility.getComponentName(Constants.INDEX_PANEL, Constants.INDEX_NEXT));
         nextStep.setEnabled(false);
+
+        List<Integer> counter = new LinkedList<>();
+        CountDownLatch checkDate = new CountDownLatch(1);
+        ScheduledExecutorService executorService = Executors.newSingleThreadScheduledExecutor();
+        Runnable checkDateRunnable = () -> {
+            if (counter.size() > (Constants.TIMEOUT / Constants.COUNTER_INTERVAL) ||
+                    (APIService.startDate != null && !APIService.startDate.isBlank() &&
+                            APIService.endDate != null && !APIService.endDate.isBlank())) {
+                checkDate.countDown();
+                executorService.shutdown();
+            } else {
+                counter.add(0);
+            }
+        };
+        executorService.scheduleWithFixedDelay(checkDateRunnable, 0, Constants.COUNTER_INTERVAL, TimeUnit.MILLISECONDS);
+        try {
+            checkDate.await();
+        } catch (InterruptedException e) {
+            LOGGER.error("Error in CountDownLatch", e);
+        }
+
         List<String> downloadErrorMessages = new LinkedList<>();
-        this.status = Constants.EMPTY;
+        this.status = Constants.MSG_DOWNLOAD_DATA;
         this.publish(0.0);
         MainFrame.setStatusAndProgressBarVisibility(true);
-
-        try {
-            /*
-             * 原本預定是先設定好APIService相關屬性之後再啟動ExecutorService
-             * 不過因為執行緒的關係，在設定好相關屬性之前就有可能會先跑到這裡來
-             * 導致判斷錯誤，以為屬性沒有被設定
-             * 因此在這裡先強迫執行緒暫停一段時間，等到屬性設定好之後再執行
-             * */
-            Thread.sleep(250);
-        } catch (Exception ignore) {}
-
         if (APIService.startDate != null && !APIService.startDate.isBlank() &&
                 APIService.endDate != null && !APIService.endDate.isBlank()) {
-            this.status = String.format(Constants.MSG_DOWNLOAD_DATA_FORMAT, Constants.DATA_TYPE_TEMPERATURE);
-            this.publish(0.0);
-            JSONArray temperatureArray = APIService.getTemperature();
-            if (temperatureArray.isEmpty()) {
-                String message = String.format(Constants.MSG_DOWNLOAD_DATA_ERROR_FORMAT, Constants.DATA_TYPE_TEMPERATURE);
-                LOGGER.error(message);
-                downloadErrorMessages.add(message);
-            } else {
-                ExcelService.temperatureArray = temperatureArray;
+
+            long start = System.currentTimeMillis();
+            List<String> allRunnable = Arrays.asList(Constants.DATA_TYPE_TEMPERATURE,
+                    Constants.DATA_TYPE_APPARENT_TEMPERATURE, Constants.DATA_TYPE_RELATIVE_HUMIDITY,
+                    Constants.DATA_TYPE_WIND_SPEED, Constants.DATA_TYPE_WIND_DIRECTION,
+                    Constants.DATA_TYPE_PRECIPITATION, Constants.DATA_TYPE_PRECIPITATION_PROBABILITY,
+                    Constants.DATA_TYPE_RAIN, Constants.DATA_TYPE_SHOWERS);
+            List<String> lockedBy = new ArrayList<>(allRunnable);
+            double percentage = 50.0 / allRunnable.size();
+            int numberOfTasks = allRunnable.size(), initialValue = 0;
+            List<Double> progressValues = new ArrayList<>();
+            progressValues.add((double) initialValue);
+            ReentrantLock reentrantLock = new ReentrantLock();
+            CountDownLatch countDownLatch = new CountDownLatch(numberOfTasks);
+            ExecutorService downloadService = Executors.newFixedThreadPool(Constants.MAX_API_COUNT);
+            MainFrame.setStatusAndProgressBar(Constants.MSG_DOWNLOAD_DATA, initialValue);
+
+            for (String dataType : allRunnable) {
+                Runnable download = () -> {
+                    JSONArray array;
+                    switch (dataType) {
+                        case Constants.DATA_TYPE_TEMPERATURE:
+                            array = APIService.getTemperature();
+                            break;
+                        case Constants.DATA_TYPE_APPARENT_TEMPERATURE:
+                            array = APIService.getApparentTemperature();
+                            break;
+                        case Constants.DATA_TYPE_RELATIVE_HUMIDITY:
+                            array = APIService.getRelativeHumidity();
+                            break;
+                        case Constants.DATA_TYPE_WIND_SPEED:
+                            array = APIService.getWindSpeed();
+                            break;
+                        case Constants.DATA_TYPE_WIND_DIRECTION:
+                            array = APIService.getWindDirection();
+                            break;
+                        case Constants.DATA_TYPE_PRECIPITATION:
+                            array = APIService.getPrecipitation();
+                            break;
+                        case Constants.DATA_TYPE_PRECIPITATION_PROBABILITY:
+                            array = APIService.getPrecipitationProbability();
+                            break;
+                        case Constants.DATA_TYPE_RAIN:
+                            array = APIService.getRain();
+                            break;
+                        case Constants.DATA_TYPE_SHOWERS:
+                            array = APIService.getShowers();
+                            break;
+                        default:
+                            array = new JSONArray();
+                            break;
+                    }
+                    if (array.isEmpty()) {
+                        String message = String.format(Constants.MSG_DOWNLOAD_DATA_ERROR_FORMAT, dataType);
+                        LOGGER.error(message);
+                        synchronized (downloadErrorMessages) {
+                            downloadErrorMessages.add(message);
+                            for (int left = 0; left < numberOfTasks - countDownLatch.getCount(); left++) {
+                                countDownLatch.countDown();
+                            }
+                            downloadService.shutdown();
+                        }
+                    } else {
+                        switch (dataType) {
+                            case Constants.DATA_TYPE_TEMPERATURE:
+                                ExcelService.temperatureArray = array;
+                                break;
+                            case Constants.DATA_TYPE_APPARENT_TEMPERATURE:
+                                ExcelService.apparentTemperatureArray = array;
+                                break;
+                            case Constants.DATA_TYPE_RELATIVE_HUMIDITY:
+                                ExcelService.relativeHumidityArray = array;
+                                break;
+                            case Constants.DATA_TYPE_WIND_SPEED:
+                                ExcelService.windSpeedArray = array;
+                                break;
+                            case Constants.DATA_TYPE_WIND_DIRECTION:
+                                ExcelService.windDirectionArray = array;
+                                break;
+                            case Constants.DATA_TYPE_PRECIPITATION:
+                                ExcelService.precipitationArray = array;
+                                break;
+                            case Constants.DATA_TYPE_PRECIPITATION_PROBABILITY:
+                                ExcelService.precipitationProbabilityArray = array;
+                                break;
+                            case Constants.DATA_TYPE_RAIN:
+                                ExcelService.rainArray = array;
+                                break;
+                            case Constants.DATA_TYPE_SHOWERS:
+                                ExcelService.showersArray = array;
+                                break;
+                            default:
+                                break;
+                        }
+                    }
+                    try {
+                        reentrantLock.lock();
+                        if (!lockedBy.isEmpty()) {
+                            progressValues.add(percentage);
+                            int DNE = -1;
+                            int idx = lockedBy.stream().filter(i -> i.equals(dataType))
+                                    .map(lockedBy::indexOf).findFirst().orElse(DNE);
+                            if (idx > DNE) {
+                                lockedBy.remove(idx);
+                            }
+                            MainFrame.setStatusAndProgressBar(
+                                    String.format(Constants.MSG_DOWNLOAD_DATA_FORMAT, dataType),
+                                    Integer.parseInt(Long.toString(Math.round(progressValues
+                                            .stream().reduce(0.0, Double::sum)))));
+                        }
+                    } finally {
+                        countDownLatch.countDown();
+                        reentrantLock.unlock();
+                    }
+                };
+                downloadService.execute(download);
             }
 
-            this.status = String.format(Constants.MSG_DOWNLOAD_DATA_FORMAT, Constants.DATA_TYPE_APPARENT_TEMPERATURE);
-            this.publish(10.0);
-            JSONArray apparentTemperatureArray = APIService.getApparentTemperature();
-            if (apparentTemperatureArray.isEmpty()) {
-                String message = String.format(Constants.MSG_DOWNLOAD_DATA_ERROR_FORMAT, Constants.DATA_TYPE_APPARENT_TEMPERATURE);
-                LOGGER.error(message);
-                downloadErrorMessages.add(message);
-            } else {
-                ExcelService.apparentTemperatureArray = apparentTemperatureArray;
+            try {
+                countDownLatch.await();
+            } catch (InterruptedException ex) {
+                LOGGER.error("Error in CountDownLatch", ex);
+            } finally {
+                downloadService.shutdown();
             }
-
-            this.status = String.format(Constants.MSG_DOWNLOAD_DATA_FORMAT, Constants.DATA_TYPE_RELATIVE_HUMIDITY);
-            this.publish(20.0);
-            JSONArray relativeHumidityArray = APIService.getRelativeHumidity();
-            if (relativeHumidityArray.isEmpty()) {
-                String message = String.format(Constants.MSG_DOWNLOAD_DATA_ERROR_FORMAT, Constants.DATA_TYPE_RELATIVE_HUMIDITY);
-                LOGGER.error(message);
-                downloadErrorMessages.add(message);
-            } else {
-                ExcelService.relativeHumidityArray = relativeHumidityArray;
-            }
-
-            this.status = String.format(Constants.MSG_DOWNLOAD_DATA_FORMAT, Constants.DATA_TYPE_WIND_SPEED);
-            this.publish(30.0);
-            JSONArray windSpeedArray = APIService.getWindSpeed();
-            if (windSpeedArray.isEmpty()) {
-                String message = String.format(Constants.MSG_DOWNLOAD_DATA_ERROR_FORMAT, Constants.DATA_TYPE_WIND_SPEED);
-                LOGGER.error(message);
-                downloadErrorMessages.add(message);
-            } else {
-                ExcelService.windSpeedArray = windSpeedArray;
-            }
-
-            this.status = String.format(Constants.MSG_DOWNLOAD_DATA_FORMAT, Constants.DATA_TYPE_WIND_DIRECTION);
-            this.publish(40.0);
-            JSONArray windDirectionArray = APIService.getWindDirection();
-            if (windDirectionArray.isEmpty()) {
-                String message = String.format(Constants.MSG_DOWNLOAD_DATA_ERROR_FORMAT, Constants.DATA_TYPE_WIND_DIRECTION);
-                LOGGER.error(message);
-                downloadErrorMessages.add(message);
-            } else {
-                ExcelService.windDirectionArray = windDirectionArray;
-            }
-
-            this.status = String.format(Constants.MSG_DOWNLOAD_DATA_FORMAT, Constants.DATA_TYPE_PRECIPITATION);
-            this.publish(50.0);
-            JSONArray precipitationArray = APIService.getPrecipitation();
-            if (precipitationArray.isEmpty()) {
-                String message = String.format(Constants.MSG_DOWNLOAD_DATA_ERROR_FORMAT, Constants.DATA_TYPE_PRECIPITATION);
-                LOGGER.error(message);
-                downloadErrorMessages.add(message);
-            } else {
-                ExcelService.precipitationArray = precipitationArray;
-            }
-
-            this.status = String.format(Constants.MSG_DOWNLOAD_DATA_FORMAT, Constants.DATA_TYPE_PRECIPITATION_PROBABILITY);
-            this.publish(60.0);
-            JSONArray precipitationProbabilityArray = APIService.getPrecipitationProbability();
-            if (precipitationProbabilityArray.isEmpty()) {
-                String message = String.format(Constants.MSG_DOWNLOAD_DATA_ERROR_FORMAT, Constants.DATA_TYPE_PRECIPITATION_PROBABILITY);
-                LOGGER.error(message);
-                downloadErrorMessages.add(message);
-            } else {
-                ExcelService.precipitationProbabilityArray = precipitationProbabilityArray;
-            }
-
-            this.status = String.format(Constants.MSG_DOWNLOAD_DATA_FORMAT, Constants.DATA_TYPE_RAIN);
-            this.publish(70.0);
-            JSONArray rainArray = APIService.getRain();
-            if (rainArray.isEmpty()) {
-                String message = String.format(Constants.MSG_DOWNLOAD_DATA_ERROR_FORMAT, Constants.DATA_TYPE_RAIN);
-                LOGGER.error(message);
-                downloadErrorMessages.add(message);
-            } else {
-                ExcelService.rainArray = rainArray;
-            }
-
-            this.status = String.format(Constants.MSG_DOWNLOAD_DATA_FORMAT, Constants.DATA_TYPE_SHOWERS);
-            this.publish(80.0);
-            JSONArray showersArray = APIService.getShowers();
-            if (showersArray.isEmpty()) {
-                String message = String.format(Constants.MSG_DOWNLOAD_DATA_ERROR_FORMAT, Constants.DATA_TYPE_SHOWERS);
-                LOGGER.error(message);
-                downloadErrorMessages.add(message);
-            } else {
-                ExcelService.showersArray = showersArray;
-            }
+            LOGGER.info("Download time: " + (System.currentTimeMillis() - start) + " milliseconds");
 
             if (!downloadErrorMessages.isEmpty()) {
                 return Constants.FAIL + PanelUtility.generateMultiLineHTMLMessage(downloadErrorMessages);

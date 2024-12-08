@@ -27,12 +27,17 @@ public class Constants {
     /**
      * 十五分鐘對應的微秒
      * */
-    public final static int QUARTER = 1000 * 60 * 15;
+    public final static int TIMEOUT = 1000 * 60 * 15;
 
     /**
      * 使用定時器時，以多少微秒作為間隔
      * */
-    public final static int COUNTER_INTERVAL = 40;
+    public final static int COUNTER_INTERVAL = 50;
+
+    /**
+     * 同一時間可以發送的最大API數量
+     * */
+    public final static int MAX_API_COUNT = 10;
 
     /*---------------------------------------------------------------------------------------------*/
 
@@ -169,6 +174,8 @@ public class Constants {
     public final static String MSG_COORDINATE_ERROR = "座標錯誤";
 
     public final static String MSG_DOWNLOAD_DATA_FORMAT = "下載%s";
+
+    public final static String MSG_DOWNLOAD_DATA = "下載資料";
 
     public final static String MSG_DOWNLOAD_DATA_ERROR_FORMAT = MSG_DOWNLOAD_DATA_FORMAT + "錯誤";
 
