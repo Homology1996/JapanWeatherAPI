@@ -172,8 +172,8 @@ public class APIService {
         longitude = Constants.LONGITUDE_TOKYO;
         latitude = Constants.LATITUDE_TOKYO;
         System.out.println(getTemperature());
-        startDate = "2024-11-11";
-        endDate = "2024-11-12";
+        startDate = "2025-04-07";
+        endDate = "2025-04-11";
         longitude = Constants.LONGITUDE_OSAKA;
         latitude = Constants.LATITUDE_OSAKA;
         System.out.println(getRain());
