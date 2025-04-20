@@ -24,9 +24,9 @@ import java.util.concurrent.TimeUnit;
 
 public class DefaultController implements ActionListener {
 
-    private final static Logger LOGGER = LogManager.getLogger(DefaultController.class);
+    private static final Logger LOGGER = LogManager.getLogger(DefaultController.class);
 
-    private final static DefaultController INSTANCE = new DefaultController();
+    private static final DefaultController INSTANCE = new DefaultController();
 
     private DefaultController() {}
 

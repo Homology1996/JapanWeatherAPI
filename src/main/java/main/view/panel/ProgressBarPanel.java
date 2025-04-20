@@ -12,7 +12,7 @@ public class ProgressBarPanel extends JPanel implements PanelUtility {
 
     private final JProgressBar progressBar = new JProgressBar(0, 100);
 
-    private final static ProgressBarPanel INSTANCE = new ProgressBarPanel();
+    private static final ProgressBarPanel INSTANCE = new ProgressBarPanel();
 
     private ProgressBarPanel() {
         PanelUtility.setPanelName(this, Constants.PROGRESS_BAR_PANEL);

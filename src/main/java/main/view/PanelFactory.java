@@ -9,7 +9,7 @@ import javax.swing.*;
 
 public class PanelFactory {
 
-    private final static PanelFactory INSTANCE = new PanelFactory();
+    private static final PanelFactory INSTANCE = new PanelFactory();
 
     private PanelFactory() {}
 

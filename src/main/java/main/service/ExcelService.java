@@ -19,7 +19,7 @@ import java.util.stream.Collectors;
 
 public class ExcelService {
 
-    private final static Logger LOGGER = LogManager.getLogger(ExcelService.class);
+    private static final Logger LOGGER = LogManager.getLogger(ExcelService.class);
 
     private ExcelService() {}
 

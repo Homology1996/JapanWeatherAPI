@@ -18,7 +18,7 @@ import java.util.concurrent.locks.ReentrantLock;
 
 public class DownloadDataController extends SwingWorker<String, Double> {
 
-    private final static Logger LOGGER = LogManager.getLogger(DownloadDataController.class);
+    private static final Logger LOGGER = LogManager.getLogger(DownloadDataController.class);
 
     private final IndexPanel indexPanel;
 

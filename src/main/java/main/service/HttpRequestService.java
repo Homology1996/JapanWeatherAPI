@@ -23,7 +23,7 @@ import java.util.*;
 
 public class HttpRequestService {
 
-    private final static Logger LOGGER = LogManager.getLogger(HttpRequestService.class);
+    private static final Logger LOGGER = LogManager.getLogger(HttpRequestService.class);
 
     private static List<String> convertInputStreamIntoStringList(InputStream inputStream) {
         List<String> result = new ArrayList<>();
@@ -64,7 +64,7 @@ public class HttpRequestService {
             }
             HttpsURLConnection.setDefaultHostnameVerifier((hostname, session) -> true);
             headers.forEach(connection::setRequestProperty);
-            if (requestBody.length() > 0) {
+            if (!requestBody.isEmpty()) {
                 connection.getOutputStream().write(requestBody.toString().getBytes(StandardCharsets.UTF_8));
             }
             List<String> messages;
@@ -82,7 +82,7 @@ public class HttpRequestService {
                 messages = convertInputStreamIntoStringList(connection.getInputStream());
                 connection.disconnect();
             }
-            if (messages.size() > 0) {
+            if (!messages.isEmpty()) {
                 if (messages.size() > 1) {
                     LOGGER.error("The response message size is greater than 1");
                     messages.forEach(LOGGER::error);

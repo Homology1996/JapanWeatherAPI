@@ -11,7 +11,7 @@ import java.util.Map;
 
 public class APIService {
 
-    private final static Logger LOGGER = LogManager.getLogger(APIService.class);
+    private static final Logger LOGGER = LogManager.getLogger(APIService.class);
 
     private APIService() {}
 

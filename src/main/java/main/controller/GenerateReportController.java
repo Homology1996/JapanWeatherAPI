@@ -18,7 +18,7 @@ import java.util.List;
 
 public class GenerateReportController extends SwingWorker<String, Double> {
 
-    private final static Logger LOGGER = LogManager.getLogger(GenerateReportController.class);
+    private static final Logger LOGGER = LogManager.getLogger(GenerateReportController.class);
 
     private final ResultPanel resultPanel;
 
